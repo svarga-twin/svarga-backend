@@ -9,7 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('festivals', function (Blueprint $table) {
+        Schema::create('festival_models', function (Blueprint $table) {
             $table->id();
             $table->string('name'); // "Banyuwangi Ethno Carnival" dst.
             $table->string('location_type')->nullable(); // "panggung" dst.

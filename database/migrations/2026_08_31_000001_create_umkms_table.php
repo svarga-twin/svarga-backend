@@ -11,7 +11,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('umkms', function (Blueprint $table) {
+        Schema::create('umkm_models', function (Blueprint $table) {
             $table->id();
             $table->string('business_name');
             $table->string('business_type')->nullable(); // "Makanan" | "Minuman Tradisional" | "Kerajinan" dst.

@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\FestivalResource;
-use App\Models\Festival;
+use App\Models\FestivalModel;
 use Illuminate\Http\Request;
 
 class FestivalController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Festival::query()->active();
+        $query = FestivalModel::query()->active();
 
         if ($request->boolean('upcoming')) {
             $query->upcoming();
@@ -33,7 +33,7 @@ class FestivalController extends Controller
 
     public function show(int $id)
     {
-        $festival = Festival::query()->active()->find($id);
+        $festival = FestivalModel::query()->active()->find($id);
 
         if (!$festival) {
             return response()->json(['message' => 'Festival tidak ditemukan'], 404);

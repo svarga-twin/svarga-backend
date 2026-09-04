@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Festival;
+use App\Models\FestivalModel;
 use Illuminate\Database\Seeder;
 
 // Data disamakan persis dengan src/data/mockContent.js (bfestEvents) di svarga-app.
@@ -10,9 +10,9 @@ class FestivalSeeder extends Seeder
 {
     public function run(): void
     {
-        Festival::query()->delete(); // aman dijalankan berkali-kali (idempotent)
+        FestivalModel::query()->delete(); // aman dijalankan berkali-kali (idempotent)
 
-        Festival::insert([
+        FestivalModel::insert([
             [
                 'name' => 'Banyuwangi Ethno Carnival',
                 'location_type' => 'panggung',

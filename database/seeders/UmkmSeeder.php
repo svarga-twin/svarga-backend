@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Umkm;
+use App\Models\UmkmModel;
 use Illuminate\Database\Seeder;
 
 // Data disamakan persis dengan src/data/mockContent.js di svarga-app,
@@ -11,9 +11,9 @@ class UmkmSeeder extends Seeder
 {
     public function run(): void
     {
-        Umkm::query()->delete(); // aman dijalankan berkali-kali (idempotent)
+        UmkmModel::query()->delete(); // aman dijalankan berkali-kali (idempotent)
 
-        Umkm::insert([
+        UmkmModel::insert([
             [
                 'business_name' => 'Warung Bu Sari',
                 'business_type' => 'Makanan',

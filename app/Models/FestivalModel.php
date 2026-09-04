@@ -5,30 +5,34 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Umkm extends Model
+class FestivalModel extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'business_name',
-        'business_type',
-        'address',
-        'koridor_id',
-        'distance_m',
-        'rating',
+        'name',
+        'location_type',
+        'location_name',
+        'event_date',
+        'start_time',
+        'end_time',
+        'description',
         'image_url',
-        'latitude',
-        'longitude',
         'is_active',
     ];
 
     protected $casts = [
-        'rating' => 'decimal:1',
+        'event_date' => 'date',
         'is_active' => 'boolean',
     ];
 
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeUpcoming($query)
+    {
+        return $query->where('event_date', '>=', now()->toDateString());
     }
 }

@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UmkmResource;
-use App\Models\Umkm;
+use App\Models\UmkmModel;
 use Illuminate\Http\Request;
 
 class UmkmController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Umkm::query()->active();
+        $query = UmkmModel::query()->active();
 
         if ($request->filled('koridor_id')) {
             $query->where('koridor_id', $request->query('koridor_id'));
@@ -33,7 +33,7 @@ class UmkmController extends Controller
 
     public function show(int $id)
     {
-        $umkm = Umkm::query()->active()->find($id);
+        $umkm = UmkmModel::query()->active()->find($id);
 
         if (!$umkm) {
             return response()->json(['message' => 'UMKM tidak ditemukan'], 404);
