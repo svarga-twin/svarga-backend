@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             UmkmSeeder::class,
             FestivalSeeder::class,
+            SensorReadingSeeder::class,
         ]);
     }
 }
