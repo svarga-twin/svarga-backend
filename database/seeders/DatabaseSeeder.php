@@ -14,6 +14,9 @@ class DatabaseSeeder extends Seeder
             UmkmSeeder::class,
             FestivalSeeder::class,
             SensorReadingSeeder::class,
+            SoundscapeSeeder::class,
+            GeofenceSeeder::class,
+            MoodLogSeeder::class,
         ]);
     }
 }

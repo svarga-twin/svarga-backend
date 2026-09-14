@@ -33,6 +33,11 @@ php artisan serve   # http://127.0.0.1:8000
 Isi `VITE_LARAVEL_API_URL=http://127.0.0.1:8000/api` di `.env.local`
 milik `svarga-app` agar frontend memakai API ini.
 
+## Uji coba input sensor (suhu & kualitas udara)
+
+> Arahan mentor (7 Sep 2026): *"coba uji buat BE untuk inputan dari sensor:
+> 1) sensor suhu, 2) sensor kualitas udara. Alurnya dari BE langsung tampil
+> di FE, kemudian simpan di DB."*
 
 ### Alur
 
