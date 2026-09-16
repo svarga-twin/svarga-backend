@@ -24,7 +24,7 @@ class GeofenceSeeder extends Seeder
                 'welcome_title' => 'Selamat datang di Taman Blambangan!',
                 'welcome_desc' => 'Nikmati suasana hijau dan musik relaksasi untuk membantu fokusmu.',
                 'koridor_id' => 4,
-                'background_image' => null,
+                'background_image' => 'images/geofencing/zone-bg-blambangan.png',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],

@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+// Bentuk field disamakan persis dengan koridors[] di
+// src/data/mockGreenSpaces.js (svarga-app) supaya koridorService.js hanya
+// perlu menambah satu cabang fetch, tidak perlu mapping ulang di halaman.
+// `thumbnail`/`hero_image` diubah dari path relatif jadi URL absolut di
+// sini (asset() ) — gambarnya sama persis dengan yang dulu dibundel Vite,
+// cuma sekarang disajikan Laravel dari public/images/koridor/.
+class KoridorResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'green_space_id' => $this->green_space_id,
+            'short_name' => $this->short_name,
+            'formal_name' => $this->formal_name,
+            'route_label' => $this->route_label,
+            'desc' => $this->desc,
+            'thumbnail' => $this->thumbnail ? asset($this->thumbnail) : null,
+            'hero_image' => $this->hero_image ? asset($this->hero_image) : null,
+            'hijau_level' => $this->hijau_level,
+            'hijau_score' => (int) $this->hijau_score,
+            'umkm_count' => (int) $this->umkm_count,
+            'status' => $this->status,
+            'distance_meter' => $this->distance_meter,
+            'estimate_minutes' => $this->estimate_minutes,
+            'shade_score' => (int) $this->shade_score,
+            'condition_title' => $this->condition_title,
+            'condition_desc' => $this->condition_desc,
+            // Snapshot statis (baseline) — untuk suhu & kualitas udara, FE
+            // meng-overlay data live/DB dari /api/sensors/* di atas nilai ini
+            // (lihat useSensorReading.js), jadi field ini cukup jadi fallback.
+            'sensor' => $this->sensor_snapshot,
+        ];
+    }
+}

@@ -33,6 +33,19 @@ class GeofenceApiTest extends TestCase
         $this->assertEquals('Zona Aktif', $response->json('data.0.name'));
     }
 
+    public function test_background_image_dikembalikan_sebagai_url_absolut(): void
+    {
+        GeofenceModel::create([
+            'name' => 'Taman Blambangan', 'latitude' => -8.2175, 'longitude' => 114.3675,
+            'radius_meter' => 60, 'is_active' => true,
+            'background_image' => 'images/geofencing/zone-bg-blambangan.png',
+        ]);
+
+        $response = $this->getJson('/api/geofences');
+
+        $this->assertStringStartsWith('http', $response->json('data.0.background_image'));
+    }
+
     public function test_soundscape_bisa_diambil_by_id(): void
     {
         $soundscape = SoundscapeModel::create([

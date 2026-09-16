@@ -17,6 +17,8 @@ class DatabaseSeeder extends Seeder
             SoundscapeSeeder::class,
             GeofenceSeeder::class,
             MoodLogSeeder::class,
+            GreenSpaceSeeder::class,
+            KoridorSeeder::class,
         ]);
     }
 }

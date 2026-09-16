@@ -23,7 +23,7 @@ class GeofenceResource extends JsonResource
             'welcome_title' => $this->welcome_title,
             'welcome_desc' => $this->welcome_desc,
             'koridor_id' => $this->koridor_id,
-            'background_image' => $this->background_image,
+            'background_image' => $this->background_image ? asset($this->background_image) : null,
         ];
     }
 }

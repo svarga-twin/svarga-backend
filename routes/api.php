@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FestivalController;
 use App\Http\Controllers\Api\GeofenceController;
+use App\Http\Controllers\Api\GreenSpaceController;
+use App\Http\Controllers\Api\KoridorController;
 use App\Http\Controllers\Api\MoodLogController;
 use App\Http\Controllers\Api\SensorReadingController;
 use App\Http\Controllers\Api\SoundscapeController;
@@ -14,6 +16,12 @@ Route::get('/umkm/{id}', [UmkmController::class, 'show']);
 
 Route::get('/festivals', [FestivalController::class, 'index']);
 Route::get('/festivals/{id}', [FestivalController::class, 'show']);
+
+// Green space & koridor — menggantikan koleksi Firestore `green_space`/`koridor`
+// yang kosong (lihat KoridorController).
+Route::get('/green-spaces', [GreenSpaceController::class, 'index']);
+Route::get('/koridors', [KoridorController::class, 'index']);
+Route::get('/koridors/{id}', [KoridorController::class, 'show']);
 
 // Uji coba input sensor (suhu & kualitas udara) — lihat SensorReadingController
 // untuk penjelasan alur sensor -> FE -> DB lengkap.
