@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\AdminNotificationController;
+use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FestivalController;
 use App\Http\Controllers\Api\GeofenceController;
@@ -28,6 +30,7 @@ Route::get('/koridors/{id}', [KoridorController::class, 'show']);
 Route::post('/sensors/readings', [SensorReadingController::class, 'store']);
 Route::get('/sensors/live', [SensorReadingController::class, 'live']);
 Route::get('/sensors/latest', [SensorReadingController::class, 'latest']);
+Route::get('/sensors/history', [SensorReadingController::class, 'history']); // tren harian, dipakai Monitoring Lingkungan (admin)
 
 // Autentikasi (Sanctum, token-based — cocok untuk PWA/mobile).
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -46,6 +49,31 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::post('/mood-logs', [MoodLogController::class, 'store']);
 Route::get('/mood-logs/summary', [MoodLogController::class, 'summary']);
 
-// Geofencing & Soundscape Therapy.
+// Geofencing & Soundscape Therapy. `index` publik (dipakai svarga-app dan
+// tabel manajemen zona di admin lewat ?all=1); `store` khusus admin.
 Route::get('/geofences', [GeofenceController::class, 'index']);
+Route::get('/soundscapes', [SoundscapeController::class, 'index']);
 Route::get('/soundscapes/{id}', [SoundscapeController::class, 'show']);
+
+// Endpoint khusus dashboard admin (svarga-admin) — menggantikan Prisma/Supabase
+// sepenuhnya. Semua di-guard ['auth:sanctum', 'admin'] (lihat EnsureUserIsAdmin).
+Route::middleware(['auth:sanctum', 'admin'])->group(function () {
+    Route::prefix('admin')->group(function () {
+        Route::get('/users', [AdminUserController::class, 'index']);
+        Route::post('/users', [AdminUserController::class, 'store']);
+        Route::put('/users/{id}', [AdminUserController::class, 'update']);
+        Route::delete('/users/{id}', [AdminUserController::class, 'destroy']);
+        Route::get('/activity-monthly', [AdminUserController::class, 'activityMonthly']);
+        Route::get('/notifications', [AdminNotificationController::class, 'index']);
+        Route::post('/notifications/mark-read', [AdminNotificationController::class, 'markAllRead']);
+    });
+
+    // CRUD zona geofencing & event festival (baca tetap publik, lihat route di atas).
+    Route::post('/geofences', [GeofenceController::class, 'store']);
+    Route::put('/geofences/{id}', [GeofenceController::class, 'update']);
+    Route::delete('/geofences/{id}', [GeofenceController::class, 'destroy']);
+
+    Route::post('/festivals', [FestivalController::class, 'store']);
+    Route::put('/festivals/{id}', [FestivalController::class, 'update']);
+    Route::delete('/festivals/{id}', [FestivalController::class, 'destroy']);
+});

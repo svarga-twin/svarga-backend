@@ -22,7 +22,7 @@ class MoodLogController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'green_space_id' => ['required', 'integer'],
-            'mood_score' => ['required', 'integer', 'min:1', 'max:4'],
+            'mood_score' => ['required', 'integer', 'min:1', 'max:5'],
             'activity' => ['nullable', 'string', 'max:50'],
             'note' => ['nullable', 'string', 'max:1000'],
             'anonymous_session_id' => ['nullable', 'string', 'max:100'],
@@ -50,7 +50,9 @@ class MoodLogController extends Controller
     public function summary(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'green_space_id' => ['required', 'integer'],
+            // Nullable: dashboard admin butuh agregat se-kota (semua green space),
+            // sedangkan MoodHistoryPage.jsx di svarga-app mengirim satu green_space_id.
+            'green_space_id' => ['nullable', 'integer'],
             'days' => ['nullable', 'integer', 'min:1', 'max:90'],
         ]);
 
@@ -58,31 +60,39 @@ class MoodLogController extends Controller
             return response()->json(['message' => 'Parameter tidak valid', 'errors' => $validator->errors()], 422);
         }
 
-        $greenSpaceId = (int) $request->query('green_space_id');
+        $greenSpaceId = $request->filled('green_space_id') ? (int) $request->query('green_space_id') : null;
         $days = (int) ($request->query('days') ?? 7);
         $since = Carbon::now()->subDays($days - 1)->startOfDay();
 
         $logs = MoodLogModel::query()
-            ->where('green_space_id', $greenSpaceId)
+            ->when($greenSpaceId, fn ($q) => $q->where('green_space_id', $greenSpaceId))
             ->where('logged_at', '>=', $since)
             ->get(['mood_score', 'logged_at']);
 
         // Tren harian: rata-rata skor per tanggal, mengisi hari tanpa data dengan null
-        // supaya grafik FE tetap punya sumbu-x yang lengkap (bukan bolong).
+        // supaya grafik FE tetap punya sumbu-x yang lengkap (bukan bolong). Distribusi
+        // per hari (per_score) disertakan juga supaya dashboard admin bisa menggambar
+        // grafik tren multi-garis (Sangat Baik/Baik/Biasa Saja/Buruk) per tanggal,
+        // bukan cuma satu garis rata-rata.
         $byDate = $logs->groupBy(fn ($log) => $log->logged_at->toDateString());
 
         $daily = [];
         for ($i = 0; $i < $days; $i++) {
             $date = $since->copy()->addDays($i)->toDateString();
             $dayLogs = $byDate->get($date, collect());
+            $perScore = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
+            foreach ($dayLogs as $log) {
+                $perScore[$log->mood_score] = ($perScore[$log->mood_score] ?? 0) + 1;
+            }
             $daily[] = [
                 'date' => $date,
                 'average_score' => $dayLogs->isEmpty() ? null : round($dayLogs->avg('mood_score'), 2),
                 'count' => $dayLogs->count(),
+                'per_score' => $perScore,
             ];
         }
 
-        $distribution = [1 => 0, 2 => 0, 3 => 0, 4 => 0];
+        $distribution = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
         foreach ($logs as $log) {
             $distribution[$log->mood_score] = ($distribution[$log->mood_score] ?? 0) + 1;
         }
@@ -91,6 +101,7 @@ class MoodLogController extends Controller
             'green_space_id' => $greenSpaceId,
             'days' => $days,
             'total_entries' => $logs->count(),
+            'average_score' => $logs->isEmpty() ? null : round($logs->avg('mood_score'), 2),
             'daily' => $daily,
             'distribution' => $distribution,
         ]);

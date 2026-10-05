@@ -19,6 +19,8 @@ class DatabaseSeeder extends Seeder
             MoodLogSeeder::class,
             GreenSpaceSeeder::class,
             KoridorSeeder::class,
+            AdminUserSeeder::class,
+            AdminNotificationSeeder::class,
         ]);
     }
 }

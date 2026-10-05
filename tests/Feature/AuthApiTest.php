@@ -54,6 +54,34 @@ class AuthApiTest extends TestCase
         $response->assertStatus(200)->assertJsonStructure(['user', 'token']);
     }
 
+    public function test_registrasi_publik_tidak_bisa_menjadikan_diri_admin(): void
+    {
+        $response = $this->postJson('/api/auth/register', [
+            'name' => 'Bukan Admin',
+            'email' => 'bukan-admin@svarga.test',
+            'password' => 'rahasia123',
+            'is_admin' => true, // seharusnya diabaikan
+        ]);
+
+        $response->assertStatus(201)->assertJsonPath('user.is_admin', false);
+    }
+
+    public function test_user_dengan_is_admin_true_bisa_login_dan_field_is_admin_terlihat(): void
+    {
+        UserModel::factory()->create([
+            'email' => 'admin-test@svarga.test',
+            'password' => Hash::make('adminpass'),
+            'is_admin' => true,
+        ]);
+
+        $response = $this->postJson('/api/auth/login', [
+            'email' => 'admin-test@svarga.test',
+            'password' => 'adminpass',
+        ]);
+
+        $response->assertStatus(200)->assertJsonPath('user.is_admin', true);
+    }
+
     public function test_login_dengan_password_salah_ditolak(): void
     {
         UserModel::factory()->create([

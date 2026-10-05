@@ -140,4 +140,45 @@ class SensorReadingController extends Controller
             'source' => 'db_last_known',
         ], 200);
     }
+
+    /**
+     * Tren harian (rata-rata per tanggal) untuk satu jenis sensor selama N
+     * hari terakhir — dipakai grafik "Tren Kualitas Udara" di dashboard
+     * admin (Monitoring Lingkungan / Laporan & Analitik). Sama pola dengan
+     * MoodLogController@summary.
+     */
+    public function history(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'sensor_type' => ['required', 'string', 'in:' . implode(',', SensorReadingModel::TYPES)],
+            'days' => ['nullable', 'integer', 'min:1', 'max:90'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Parameter tidak valid', 'errors' => $validator->errors()], 422);
+        }
+
+        $days = (int) ($request->query('days') ?? 7);
+        $since = Carbon::now()->subDays($days - 1)->startOfDay();
+
+        $readings = SensorReadingModel::query()
+            ->type($request->query('sensor_type'))
+            ->where('recorded_at', '>=', $since)
+            ->get(['value', 'recorded_at']);
+
+        $byDate = $readings->groupBy(fn ($r) => $r->recorded_at->toDateString());
+
+        $daily = [];
+        for ($i = 0; $i < $days; $i++) {
+            $date = $since->copy()->addDays($i)->toDateString();
+            $dayReadings = $byDate->get($date, collect());
+            $daily[] = [
+                'date' => $date,
+                'average_value' => $dayReadings->isEmpty() ? null : round($dayReadings->avg('value'), 1),
+                'count' => $dayReadings->count(),
+            ];
+        }
+
+        return response()->json(['sensor_type' => $request->query('sensor_type'), 'days' => $days, 'daily' => $daily]);
+    }
 }

@@ -8,6 +8,11 @@ use App\Models\SoundscapeModel;
 
 class SoundscapeController extends Controller
 {
+    public function index()
+    {
+        return SoundscapeResource::collection(SoundscapeModel::orderBy('id')->get());
+    }
+
     public function show($id)
     {
         $soundscape = SoundscapeModel::findOrFail($id);

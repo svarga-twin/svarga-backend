@@ -13,7 +13,7 @@ class MoodLogSeeder extends Seeder
     {
         MoodLogModel::query()->delete();
 
-        $scoresPerDay = [2, 1, 3, 2, 4, 3, 4]; // representatif utk 7 hari terakhir, terlama di indeks 0
+        $scoresPerDay = [3, 2, 4, 3, 5, 4, 5]; // representatif utk 7 hari terakhir (skala 1-5), terlama di indeks 0
 
         foreach ($scoresPerDay as $daysAgo => $baseScore) {
             $offset = 6 - $daysAgo;
@@ -22,7 +22,7 @@ class MoodLogSeeder extends Seeder
                 $activities = ['belajar', 'bekerja', 'olahraga', 'lainnya'];
                 MoodLogModel::create([
                     'green_space_id' => 1,
-                    'mood_score' => max(1, min(4, $baseScore + rand(-1, 1))),
+                    'mood_score' => max(1, min(5, $baseScore + rand(-1, 1))),
                     'activity' => $activities[array_rand($activities)],
                     'anonymous_session_id' => 'seed-session-' . $offset . '-' . $i,
                     'logged_at' => now()->subDays($offset)->setTime(rand(7, 19), rand(0, 59)),

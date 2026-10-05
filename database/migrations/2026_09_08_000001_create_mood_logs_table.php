@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('anonymous_session_id')->nullable();
             $table->unsignedBigInteger('green_space_id');
-            $table->unsignedTinyInteger('mood_score'); // 1..4, lihat moods[] di MoodTrackerPage.jsx
+            $table->unsignedTinyInteger('mood_score'); // 1..5, lihat MOODS di MoodTrackerPage.jsx (1=Sangat Buruk .. 5=Sangat Baik)
             $table->string('activity')->nullable(); // 'belajar' | 'bekerja' | 'olahraga' | 'lainnya'
             $table->text('note')->nullable();
             $table->timestamp('logged_at');
