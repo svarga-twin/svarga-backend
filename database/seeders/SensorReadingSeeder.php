@@ -15,7 +15,30 @@ class SensorReadingSeeder extends Seeder
 
         $now = now();
 
+        $pollutants = [
+            SensorReadingModel::TYPE_PM10 => 1000,
+            SensorReadingModel::TYPE_SO2 => 450,
+            SensorReadingModel::TYPE_CO => 10000,
+            SensorReadingModel::TYPE_O3 => 200,
+            SensorReadingModel::TYPE_NO2 => 46,
+        ];
+
+        $pollutantRows = [];
+        foreach ($pollutants as $type => $value) {
+            $pollutantRows[] = [
+                'device_code' => 'ESP32-KOR1-DIORAMA',
+                'koridor_id' => '1',
+                'sensor_type' => $type,
+                'value' => $value,
+                'unit' => SensorReadingModel::defaultUnitFor($type),
+                'recorded_at' => $now->copy()->subHours(2),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
         SensorReadingModel::insert([
+            ...$pollutantRows,
             [
                 'device_code' => 'ESP32-KOR1-DIORAMA',
                 'koridor_id' => '1',

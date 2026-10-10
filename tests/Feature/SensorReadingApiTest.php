@@ -40,6 +40,23 @@ class SensorReadingApiTest extends TestCase
         ]);
     }
 
+    public function test_semua_polutan_ispu_dapat_mengirim_data_dengan_unit_bawaan(): void
+    {
+        foreach (SensorReadingModel::POLLUTANT_TYPES as $type) {
+            $this->postJson('/api/sensors/readings', [
+                'device_code' => 'ESP32-KOR1-DIORAMA',
+                'koridor_id' => '1',
+                'sensor_type' => $type,
+                'value' => 40,
+            ])
+                ->assertStatus(201)
+                ->assertJsonPath('data.sensor_type', $type)
+                ->assertJsonPath('data.unit', 'µg/m³');
+
+            $this->assertDatabaseHas('sensor_readings', ['sensor_type' => $type, 'value' => 40]);
+        }
+    }
+
     public function test_sensor_kualitas_udara_dapat_mengirim_data_dan_langsung_tersimpan(): void
     {
         $response = $this->postJson('/api/sensors/readings', [

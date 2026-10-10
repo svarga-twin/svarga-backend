@@ -65,8 +65,10 @@ dua endpoint terpisah:
   pun umurnya, plus flag `is_stale`. Dipakai FE kalau `/live` tidak
   mendapat data segar selama 5 menit berturut-turut.
 
-Jenis sensor yang didukung sejauh ini: `temperature` (°C) dan `air_quality`
-(AQI) — sesuai dua sensor yang diminta untuk uji coba. Menambah jenis sensor
+Jenis sensor yang didukung: `temperature` (°C), `air_quality` (AQI), dan lima
+polutan ISPU — `pm10`, `so2`, `co`, `o3`, `no2` — semuanya dalam **µg/m³**
+(CO juga µg/m³, bukan ppm). Kelimanya dipakai kartu ISPU di Home
+`svarga-app`; warna kategori dihitung di FE (`src/lib/ispu.js`). Menambah jenis sensor
 lain (kelembaban, UV, kebisingan) tidak perlu migration baru, cukup tambah
 nilai baru di `SensorReadingModel::TYPES`.
 
