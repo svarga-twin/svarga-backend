@@ -33,6 +33,8 @@ class KoridorSeeder extends Seeder
                 'status' => 'pilot',
                 'distance_meter' => 400,
                 'estimate_minutes' => 6,
+                // Koordinat perkiraan (awal = Taman Sritanjung, akhir = Taman Blambangan); ganti dengan hasil survei.
+                'path' => [[-8.21944, 114.36972], [-8.21833, 114.36951], [-8.21748, 114.36869], [-8.2175, 114.3675]],
                 'shade_score' => 82,
                 'condition_title' => 'Kondisi Koridor Terpilih',
                 'condition_desc' => 'Koridor ini memiliki cakupan pohon yang rimbun dan kualitas udara paling bersih di pusat kota. Dilengkapi infrastruktur pedestrian teduh.',
@@ -144,6 +146,7 @@ class KoridorSeeder extends Seeder
             $sensor = $row['sensor'];
             $sensor['recorded_at'] = now()->toIso8601String();
             unset($row['sensor']);
+            $row['path'] = isset($row['path']) ? json_encode($row['path']) : null;
             $row['sensor_snapshot'] = json_encode($sensor);
             $row['created_at'] = now();
             $row['updated_at'] = now();

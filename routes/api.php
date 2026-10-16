@@ -25,12 +25,13 @@ Route::get('/green-spaces', [GreenSpaceController::class, 'index']);
 Route::get('/koridors', [KoridorController::class, 'index']);
 Route::get('/koridors/{id}', [KoridorController::class, 'show']);
 
-// Uji coba input sensor (suhu & kualitas udara) — lihat SensorReadingController
-// untuk penjelasan alur sensor -> FE -> DB lengkap.
-Route::post('/sensors/readings', [SensorReadingController::class, 'store']);
-Route::get('/sensors/live', [SensorReadingController::class, 'live']);
-Route::get('/sensors/latest', [SensorReadingController::class, 'latest']);
-Route::get('/sensors/history', [SensorReadingController::class, 'history']); // tren harian, dipakai Monitoring Lingkungan (admin)
+// Sensor. ESP32 mengirim lewat POST (autentikasi X-Device-Key + throttle per
+// perangkat); FE membaca snapshot semua jenis sensor dalam satu request.
+Route::post('/sensors/readings', [SensorReadingController::class, 'store'])
+    ->middleware(['device', 'throttle:sensor-ingest']);
+Route::get('/sensors/snapshot', [SensorReadingController::class, 'snapshot']);
+Route::get('/sensors/active', [SensorReadingController::class, 'active']); // wilayah yang sedang ON (home)
+Route::get('/sensors/history', [SensorReadingController::class, 'history']); // tren harian, Monitoring Lingkungan (admin)
 
 // Autentikasi (Sanctum, token-based — cocok untuk PWA/mobile).
 Route::post('/auth/register', [AuthController::class, 'register']);

@@ -47,6 +47,30 @@ class KoridorApiTest extends TestCase
         $this->assertStringStartsWith('http', $response->json('data.thumbnail'));
     }
 
+    public function test_koridor_mengembalikan_path_untuk_peta(): void
+    {
+        $koridor = KoridorModel::create([
+            'short_name' => 'RTH Sritanjung', 'formal_name' => 'Koridor 1: Sritanjung',
+            'hijau_level' => 'paling_hijau', 'hijau_score' => 5, 'status' => 'pilot',
+            'path' => [[-8.21944, 114.36972], [-8.2175, 114.3675]],
+        ]);
+
+        $this->getJson("/api/koridors/{$koridor->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('data.path.0.0', -8.21944)
+            ->assertJsonCount(2, 'data.path');
+    }
+
+    public function test_koridor_tanpa_path_mengembalikan_null(): void
+    {
+        $koridor = KoridorModel::create([
+            'short_name' => 'Kalilo', 'formal_name' => 'Koridor 2: Kalilo',
+            'hijau_level' => 'agak_hijau', 'hijau_score' => 4, 'status' => 'rencana',
+        ]);
+
+        $this->getJson("/api/koridors/{$koridor->id}")->assertJsonPath('data.path', null);
+    }
+
     public function test_koridor_yang_tidak_ada_mengembalikan_404(): void
     {
         $this->getJson('/api/koridors/999')->assertStatus(404);

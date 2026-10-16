@@ -16,7 +16,11 @@ return [
         // 'https://svarga-app.vercel.app',
     ],
 
-    'allowed_origins_patterns' => [],
+    // Dev: izinkan akses dari HP/laptop lain di WiFi yang sama (mis. http://192.168.1.x:5173).
+    // Produksi: hapus pola ini dan isi 'allowed_origins' dengan domain asli saja.
+    'allowed_origins_patterns' => [
+        '#^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+):\d+$#',
+    ],
 
     'allowed_headers' => ['*'],
 

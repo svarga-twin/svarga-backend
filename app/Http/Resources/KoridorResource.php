@@ -30,6 +30,8 @@ class KoridorResource extends JsonResource
             'status' => $this->status,
             'distance_meter' => $this->distance_meter,
             'estimate_minutes' => $this->estimate_minutes,
+            // Jalur untuk peta: [[lat, lng], ...] atau null bila belum ada datanya.
+            'path' => $this->path,
             'shade_score' => (int) $this->shade_score,
             'condition_title' => $this->condition_title,
             'condition_desc' => $this->condition_desc,

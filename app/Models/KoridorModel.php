@@ -14,7 +14,7 @@ class KoridorModel extends Model
     protected $fillable = [
         'green_space_id', 'short_name', 'formal_name', 'route_label', 'desc',
         'thumbnail', 'hero_image', 'hijau_level', 'hijau_score', 'umkm_count',
-        'status', 'distance_meter', 'estimate_minutes', 'shade_score',
+        'status', 'distance_meter', 'estimate_minutes', 'path', 'shade_score',
         'condition_title', 'condition_desc', 'sensor_snapshot',
     ];
 
@@ -25,6 +25,7 @@ class KoridorModel extends Model
         'estimate_minutes' => 'integer',
         'shade_score' => 'integer',
         'sensor_snapshot' => 'array',
+        'path' => 'array',
     ];
 
     public function greenSpace()

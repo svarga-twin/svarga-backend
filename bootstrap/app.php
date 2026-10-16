@@ -7,17 +7,20 @@ use Illuminate\Http\Request;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__ . '/../routes/web.php',
         api: __DIR__ . '/../routes/api.php',
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['admin' => \App\Http\Middleware\EnsureUserIsAdmin::class]);
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+            'device' => \App\Http\Middleware\AuthenticateDevice::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $e, Request $request) {
@@ -36,6 +39,11 @@ return Application::configure(basePath: dirname(__DIR__))
             }
             if ($e instanceof ModelNotFoundException || $e instanceof NotFoundHttpException) {
                 return response()->json(['message' => 'Data tidak ditemukan.'], 404);
+            }
+            // 429 (throttle), 405, dst. harus tetap dengan status aslinya — ESP32
+            // membaca 429 + Retry-After untuk tahu kapan boleh mengirim lagi.
+            if ($e instanceof HttpExceptionInterface) {
+                return response()->json(['message' => $e->getMessage() ?: 'Permintaan ditolak.'], $e->getStatusCode(), $e->getHeaders());
             }
             return response()->json(['message' => config('app.debug') ? $e->getMessage() : 'Terjadi kesalahan pada server.',], 500);
         });

@@ -7,153 +7,191 @@ use App\Http\Resources\SensorReadingResource;
 use App\Models\SensorReadingModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * Uji coba BE untuk inputan sensor (arahan mentor, 7 Sep 2026):
- *   1. Sensor suhu
- *   2. Sensor kualitas udara
+ * Alur sensor:
  *
- * Alur yang diminta: data dari sensor -> langsung tampil di FE -> baru
- * disimpan ke DB. Tiga endpoint disediakan untuk mendukung alur itu:
+ *   ESP32 --POST /api/sensors/readings (X-Device-Key)--> store()
+ *   FE    --GET  /api/sensors/snapshot?koridor_id=1----> snapshot()   (semua jenis, 1 request)
+ *   FE    --GET  /api/sensors/active-------------------> active()     (wilayah yang sedang ON)
+ *   Admin --GET  /api/sensors/history?sensor_type=...--> history()
  *
- *   POST /api/sensors/readings   Diperiksa dulu (validasi), payload yang
- *                                 sudah bersih dipakai sebagai bentuk
- *                                 balasan yang langsung bisa dirender FE
- *                                 (echo real-time), BARU kemudian
- *                                 disimpan lewat SensorReadingModel::create().
- *                                 Dipanggil oleh ESP32 (atau simulator saat
- *                                 hardware belum tersedia).
- *
- *   GET  /api/sensors/live       "Konsumsi langsung": hanya mengembalikan
- *                                 baris jika umurnya < 5 menit (FRESHNESS
- *                                 WINDOW). Dipakai FE untuk polling normal.
- *
- *   GET  /api/sensors/latest     Fallback dari DB: selalu mengembalikan
- *                                 baris terakhir yang tersimpan, berapa pun
- *                                 umurnya, plus flag is_stale. Dipakai FE
- *                                 kalau /live tidak mendapat data segar
- *                                 dalam 5 menit terakhir (lihat
- *                                 src/hooks/useSensorReading.js di svarga-app).
+ * Payload ESP32 — datar (koridor milik perangkat) atau multi-wilayah:
+ *   {"temperature":30.2,"pm10":41,"co":2300,"ts":1790000000}
+ *   {"wilayah":[{"no":1,"temperature":30.2,"pm25":54},{"no":2,...}]}   // koridor_id = no
+ * Hanya SATU wilayah yang bisa ON di perangkat. ESP32 menyertakan `aktif` (no wilayah, 0 = semua OFF)
+ * dan hanya mengirim data wilayah aktif:
+ *   {"aktif":2,"wilayah":[{"no":2,"temperature":33.5,"pm25":72,"led":true}]}
+ * `ts` (epoch detik) opsional; tanpa NTP cukup dihilangkan, server memakai jam sendiri.
  */
 class SensorReadingController extends Controller
 {
-    /** Jendela "data langsung"/segar, dalam menit, sesuai arahan mentor. */
-    public const FRESHNESS_WINDOW_MINUTES = 5;
+    private const SNAPSHOT_TTL_SECONDS = 15;
+    private const ACTIVE_CACHE_KEY = 'sensor:active_koridor';
 
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'device_code' => ['required', 'string', 'max:100'],
-            'koridor_id' => ['nullable', 'string', 'max:50'],
-            'sensor_type' => ['required', 'string', 'in:' . implode(',', SensorReadingModel::TYPES)],
-            'value' => ['required', 'numeric'],
-            'unit' => ['nullable', 'string', 'max:20'],
-            'recorded_at' => ['nullable', 'date'],
-        ]);
+        $device = $request->attributes->get('device');
 
+        $rules = [
+            'ts' => ['nullable', 'integer'],
+            'aktif' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'wilayah' => ['nullable', 'array', 'max:20'],
+            'wilayah.*.no' => ['required_with:wilayah', 'integer', 'min:1'],
+            'wilayah.*.led' => ['nullable', 'boolean'],
+        ];
+        foreach (SensorReadingModel::TYPES as $type) {
+            $rules[$type] = ['nullable', 'numeric', 'between:-100000,10000000'];
+            $rules["wilayah.*.$type"] = ['nullable', 'numeric', 'between:-100000,10000000'];
+        }
+
+        $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
             return response()->json(['message' => 'Data sensor tidak valid', 'errors' => $validator->errors()], 422);
         }
 
-        $payload = $validator->validated();
-        $payload['unit'] = $payload['unit'] ?? SensorReadingModel::defaultUnitFor($payload['sensor_type']);
-        $payload['recorded_at'] = $payload['recorded_at'] ?? now();
+        // Dua bentuk payload:
+        //  - datar            {"temperature":30.2,"pm10":41}      -> koridor milik perangkat
+        //  - multi-wilayah    {"wilayah":[{"no":1,"temperature":..},{"no":2,..}]}  -> koridor_id = no
+        $groups = [];
+        $data = $validator->validated();
+        foreach ($data['wilayah'] ?? [] as $w) {
+            $groups[(string) $w['no']] = $this->onlySensorValues($w);
+        }
+        if (!$groups && ($flat = $this->onlySensorValues($data))) {
+            $groups[(string) $device->koridor_id] = $flat;
+        }
+        $groups = array_filter($groups);
 
-        // 1) Bentuk dulu objek bacaan yang siap dipakai FE (belum menyentuh DB
-        //    sama sekali) — ini yang dimaksud "langsung tampil di FE": FE bisa
-        //    memakai persis field yang sama dari response POST ini tanpa perlu
-        //    query ulang, karena bentuknya sudah final di sini.
-        $reading = new SensorReadingModel($payload);
-
-        // 2) Baru simpan ke database setelah bentuk balasannya siap.
-        $reading->save();
-
-        return response()->json([
-            'message' => 'Data sensor diterima',
-            'data' => new SensorReadingResource($reading),
-        ], 201);
-    }
-
-    public function live(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'sensor_type' => ['required', 'string', 'in:' . implode(',', SensorReadingModel::TYPES)],
-            'koridor_id' => ['nullable', 'string'],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['message' => 'Parameter tidak valid', 'errors' => $validator->errors()], 422);
+        // Wilayah aktif (LED ON) dari perangkat. 0 / tanpa wilayah = semua OFF.
+        $reportsActive = array_key_exists('aktif', $data) && $data['aktif'] !== null;
+        if ($reportsActive) {
+            $aktif = (int) $data['aktif'];
+            Cache::forever(self::ACTIVE_CACHE_KEY, [
+                'koridor_id' => $aktif > 0 ? (string) $aktif : null,
+                'at' => time(),
+            ]);
+            $device->forceFill(['last_seen_at' => now()])->save();
         }
 
-        $latest = SensorReadingModel::query()
-            ->type($request->query('sensor_type'))
-            ->koridor($request->query('koridor_id'))
-            ->latest('recorded_at')
-            ->first();
-
-        $isFresh = $latest && $latest->recorded_at->gt(Carbon::now()->subMinutes(self::FRESHNESS_WINDOW_MINUTES));
-
-        if (!$isFresh) {
-            // Tidak ada data yang dikonsumsi "langsung" dalam 5 menit terakhir.
-            // FE diharapkan fallback ke GET /api/sensors/latest (lihat useSensorReading.js).
-            return response()->json([
-                'data' => null,
-                'is_stale' => true,
-                'freshness_window_minutes' => self::FRESHNESS_WINDOW_MINUTES,
-            ], 200);
+        if (!$groups && $reportsActive) {
+            // Semua wilayah OFF: tidak ada bacaan untuk disimpan, tapi status aktif sudah tercatat.
+            return response()->json(['ok' => true, 'n' => 0, 't' => time()], 201);
+        }
+        if (!$groups) {
+            return response()->json(['message' => 'Tidak ada nilai sensor yang dikenali.', 'allowed' => SensorReadingModel::TYPES], 422);
         }
 
-        return response()->json([
-            'data' => new SensorReadingResource($latest),
-            'is_stale' => false,
-            'freshness_window_minutes' => self::FRESHNESS_WINDOW_MINUTES,
-        ], 200);
-    }
-
-    public function latest(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'sensor_type' => ['required', 'string', 'in:' . implode(',', SensorReadingModel::TYPES)],
-            'koridor_id' => ['nullable', 'string'],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['message' => 'Parameter tidak valid', 'errors' => $validator->errors()], 422);
+        $recordedAt = $this->resolveTimestamp($request->input('ts'));
+        $rows = [];
+        foreach ($groups as $koridorId => $values) {
+            foreach ($values as $type => $value) {
+                $rows[] = [
+                    'device_code' => $device->device_code,
+                    'koridor_id' => $koridorId === '' ? null : $koridorId,
+                    'sensor_type' => $type,
+                    'value' => $value,
+                    'recorded_at' => $recordedAt,
+                ];
+            }
         }
 
-        $latest = SensorReadingModel::query()
-            ->type($request->query('sensor_type'))
-            ->koridor($request->query('koridor_id'))
-            ->latest('recorded_at')
-            ->first();
-
-        if (!$latest) {
-            return response()->json(['data' => null, 'is_stale' => true], 200);
+        SensorReadingModel::insert($rows); // satu query untuk semua wilayah & jenis sensor
+        $device->forceFill(['last_seen_at' => now()])->save();
+        foreach (array_keys($groups) as $koridorId) {
+            Cache::forget($this->snapshotCacheKey($koridorId === '' ? null : (string) $koridorId));
         }
 
-        $isStale = $latest->recorded_at->lte(Carbon::now()->subMinutes(self::FRESHNESS_WINDOW_MINUTES));
-
-        return response()->json([
-            'data' => new SensorReadingResource($latest),
-            'is_stale' => $isStale,
-            'source' => 'db_last_known',
-        ], 200);
+        // Balasan sengaja sekecil mungkin (hemat RAM/bandwidth ESP32).
+        // `t` = jam server (epoch) supaya ESP bisa menyetel jam tanpa NTP.
+        return response()->json(['ok' => true, 'n' => count($rows), 't' => time()], 201);
     }
 
     /**
-     * Tren harian (rata-rata per tanggal) untuk satu jenis sensor selama N
-     * hari terakhir — dipakai grafik "Tren Kualitas Udara" di dashboard
-     * admin (Monitoring Lingkungan / Laporan & Analitik). Sama pola dengan
-     * MoodLogController@summary.
+     * Wilayah (koridor) yang sedang ON di perangkat — dipakai kartu ISPU di home.
+     * `koridor_id` null = semua OFF, atau perangkat tidak melapor > 5 menit.
      */
+    public function active()
+    {
+        $state = Cache::get(self::ACTIVE_CACHE_KEY);
+        $reportedAt = $state ? Carbon::createFromTimestamp($state['at']) : null;
+        $isStale = !$reportedAt || $reportedAt->lte(Carbon::now()->subMinutes(SensorReadingModel::FRESHNESS_WINDOW_MINUTES));
+
+        return response()->json([
+            'koridor_id' => $isStale ? null : $state['koridor_id'],
+            'updated_at' => $reportedAt?->toIso8601String(),
+            'is_stale' => $isStale,
+        ]);
+    }
+
+    /**
+     * Bacaan terakhir SEMUA jenis sensor satu koridor dalam satu request.
+     * Tiap bacaan membawa `is_stale` (umur > 5 menit) — data lama tetap
+     * dikembalikan sebagai "last known" dari DB, jadi FE tidak perlu dua endpoint.
+     */
+    public function snapshot(Request $request)
+    {
+        $koridorId = $request->query('koridor_id');
+        $koridorId = is_scalar($koridorId) && $koridorId !== '' ? (string) $koridorId : null;
+
+        $payload = Cache::remember(
+            $this->snapshotCacheKey($koridorId),
+            self::SNAPSHOT_TTL_SECONDS,
+            fn () => $this->buildSnapshot($koridorId),
+        );
+
+        return response()->json($payload);
+    }
+
+    private function buildSnapshot(?string $koridorId): array
+    {
+        // Satu query: baris terbaru per sensor_type (join ke MAX(recorded_at)).
+        $latest = SensorReadingModel::query()
+            ->from('sensor_readings as r')
+            ->joinSub(
+                SensorReadingModel::query()
+                    ->select('sensor_type', DB::raw('MAX(recorded_at) as max_at'))
+                    ->when($koridorId, fn ($q) => $q->where('koridor_id', $koridorId))
+                    ->groupBy('sensor_type'),
+                'm',
+                fn ($j) => $j->on('r.sensor_type', '=', 'm.sensor_type')->on('r.recorded_at', '=', 'm.max_at'),
+            )
+            ->when($koridorId, fn ($q) => $q->where('r.koridor_id', $koridorId))
+            ->select('r.*')
+            ->orderByDesc('r.id')
+            ->get()
+            ->unique('sensor_type');
+
+        $threshold = Carbon::now()->subMinutes(SensorReadingModel::FRESHNESS_WINDOW_MINUTES);
+        $readings = [];
+        foreach ($latest as $row) {
+            $readings[$row->sensor_type] = [
+                ...(new SensorReadingResource($row))->resolve(),
+                'is_stale' => $row->recorded_at->lte($threshold),
+            ];
+        }
+
+        $newest = $latest->max('recorded_at');
+
+        return [
+            'koridor_id' => $koridorId,
+            'updated_at' => $newest?->toIso8601String(),
+            'is_stale' => !$newest || $newest->lte($threshold),
+            'readings' => (object) $readings,
+        ];
+    }
+
+    /** Tren harian (rata-rata per tanggal) — dihitung di database, bukan di PHP. */
     public function history(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'sensor_type' => ['required', 'string', 'in:' . implode(',', SensorReadingModel::TYPES)],
+            'koridor_id' => ['nullable', 'string', 'max:50'],
             'days' => ['nullable', 'integer', 'min:1', 'max:90'],
         ]);
-
         if ($validator->fails()) {
             return response()->json(['message' => 'Parameter tidak valid', 'errors' => $validator->errors()], 422);
         }
@@ -161,24 +199,53 @@ class SensorReadingController extends Controller
         $days = (int) ($request->query('days') ?? 7);
         $since = Carbon::now()->subDays($days - 1)->startOfDay();
 
-        $readings = SensorReadingModel::query()
-            ->type($request->query('sensor_type'))
+        $byDate = SensorReadingModel::query()
+            ->where('sensor_type', $request->query('sensor_type'))
+            ->when($request->query('koridor_id'), fn ($q, $id) => $q->where('koridor_id', $id))
             ->where('recorded_at', '>=', $since)
-            ->get(['value', 'recorded_at']);
-
-        $byDate = $readings->groupBy(fn ($r) => $r->recorded_at->toDateString());
+            ->selectRaw('DATE(recorded_at) as day, AVG(value) as avg_value, COUNT(*) as n')
+            ->groupBy('day')
+            ->get()
+            ->keyBy('day');
 
         $daily = [];
         for ($i = 0; $i < $days; $i++) {
             $date = $since->copy()->addDays($i)->toDateString();
-            $dayReadings = $byDate->get($date, collect());
+            $row = $byDate->get($date);
             $daily[] = [
                 'date' => $date,
-                'average_value' => $dayReadings->isEmpty() ? null : round($dayReadings->avg('value'), 1),
-                'count' => $dayReadings->count(),
+                'average_value' => $row ? round((float) $row->avg_value, 1) : null,
+                'count' => $row ? (int) $row->n : 0,
             ];
         }
 
         return response()->json(['sensor_type' => $request->query('sensor_type'), 'days' => $days, 'daily' => $daily]);
+    }
+
+    /** @return array<string, float|int|string> hanya field yang merupakan jenis sensor & tidak null */
+    private function onlySensorValues(array $source): array
+    {
+        return array_filter(
+            array_intersect_key($source, array_flip(SensorReadingModel::TYPES)),
+            fn ($v) => $v !== null,
+        );
+    }
+
+    /** Pakai `ts` dari ESP hanya jika masuk akal (jam ESP tanpa NTP sering ngawur). */
+    private function resolveTimestamp(mixed $ts): Carbon
+    {
+        if ($ts !== null) {
+            $candidate = Carbon::createFromTimestampUTC((int) $ts);
+            if ($candidate->between(now()->subDay(), now()->addMinutes(5))) {
+                return $candidate;
+            }
+        }
+
+        return now();
+    }
+
+    private function snapshotCacheKey(?string $koridorId): string
+    {
+        return 'sensor:snapshot:' . ($koridorId ?? 'all');
     }
 }

@@ -16,6 +16,8 @@ class UmkmSeeder extends Seeder
         UmkmModel::insert([
             [
                 'business_name' => 'Warung Bu Sari',
+                'latitude' => -8.219,
+                'longitude' => 114.3702,
                 'business_type' => 'Makanan',
                 'address' => 'Sekitar Taman Sritanjung',
                 'koridor_id' => '1',
@@ -28,6 +30,8 @@ class UmkmSeeder extends Seeder
             ],
             [
                 'business_name' => 'Es Dawet Mbak Tini',
+                'latitude' => -8.2178,
+                'longitude' => 114.3688,
                 'business_type' => 'Minuman Tradisional',
                 'address' => 'Sekitar Taman Sritanjung',
                 'koridor_id' => '1',
@@ -40,6 +44,8 @@ class UmkmSeeder extends Seeder
             ],
             [
                 'business_name' => 'Rujak Soto Bu Ida',
+                'latitude' => -8.2172,
+                'longitude' => 114.3668,
                 'business_type' => 'Makanan',
                 'address' => 'Sekitar Taman Blambangan',
                 'koridor_id' => '4',
@@ -52,6 +58,8 @@ class UmkmSeeder extends Seeder
             ],
             [
                 'business_name' => 'Batik Gajah Oling Corner',
+                'latitude' => -8.2183,
+                'longitude' => 114.3693,
                 'business_type' => 'Kerajinan',
                 'address' => 'Koridor 1',
                 'koridor_id' => '1',
