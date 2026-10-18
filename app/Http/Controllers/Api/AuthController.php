@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
+use App\Models\AdminNotificationModel;
 use App\Models\UserModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -40,6 +41,8 @@ class AuthController extends Controller
             'email' => $request->input('email'),
             'password' => Hash::make($request->input('password')),
         ]);
+
+        AdminNotificationModel::notify('pengguna', 'Pendaftaran Pengguna Baru', "{$user->name} ({$user->email}) mendaftar lewat aplikasi.");
 
         $token = $user->createToken('svarga-app')->plainTextToken;
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\GeofenceResource;
+use App\Models\AdminNotificationModel;
 use App\Models\GeofenceModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -44,6 +45,8 @@ class GeofenceController extends Controller
         }
 
         $zone = GeofenceModel::create($validator->validated() + ['is_active' => $request->boolean('is_active', true)]);
+
+        AdminNotificationModel::notify('geofence', 'Zona Geofence Baru', "Zona {$zone->name} (radius {$zone->radius_meter} m) ditambahkan.");
 
         return response()->json(['message' => 'Zona berhasil dibuat', 'data' => new GeofenceResource($zone)], 201);
     }

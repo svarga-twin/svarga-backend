@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\AdminNotificationController;
+use App\Http\Controllers\Api\AdminSensorDeviceController;
+use App\Http\Controllers\Api\AdminSettingsController;
 use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FestivalController;
@@ -67,6 +69,18 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
         Route::get('/activity-monthly', [AdminUserController::class, 'activityMonthly']);
         Route::get('/notifications', [AdminNotificationController::class, 'index']);
         Route::post('/notifications/mark-read', [AdminNotificationController::class, 'markAllRead']);
+
+        // Sensor IoT (perangkat ESP32), pengaturan, dan backup — halaman Sensor IoT & Pengaturan.
+        Route::get('/sensor-devices', [AdminSensorDeviceController::class, 'index']);
+        Route::post('/sensor-devices', [AdminSensorDeviceController::class, 'store']);
+        Route::put('/sensor-devices/{id}', [AdminSensorDeviceController::class, 'update']);
+        Route::post('/sensor-devices/{id}/rotate-key', [AdminSensorDeviceController::class, 'rotateKey']);
+        Route::delete('/sensor-devices/{id}', [AdminSensorDeviceController::class, 'destroy']);
+
+        Route::get('/settings', [AdminSettingsController::class, 'show']);
+        Route::put('/settings', [AdminSettingsController::class, 'update']);
+        Route::post('/backup', [AdminSettingsController::class, 'backup']);
+        Route::get('/backup/download', [AdminSettingsController::class, 'download']);
     });
 
     // CRUD zona geofencing & event festival (baca tetap publik, lihat route di atas).

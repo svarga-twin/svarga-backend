@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\FestivalResource;
+use App\Models\AdminNotificationModel;
 use App\Models\FestivalModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -82,6 +83,8 @@ class FestivalController extends Controller
         }
 
         $festival = FestivalModel::create($validator->validated() + ['location_type' => 'panggung', 'is_active' => true]);
+
+        AdminNotificationModel::notify('festival', 'Event Festival Baru Ditambahkan', "{$festival->name} dijadwalkan {$festival->event_date->toDateString()} di {$festival->location_name}.");
 
         return response()->json(['message' => 'Event berhasil dibuat', 'data' => new FestivalResource($festival)], 201);
     }

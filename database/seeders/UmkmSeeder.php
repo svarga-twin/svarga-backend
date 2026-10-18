@@ -65,7 +65,7 @@ class UmkmSeeder extends Seeder
                 'koridor_id' => '1',
                 'distance_m' => 90,
                 'rating' => 4.5,
-                'image_url' => 'images/umkm/umkm-batik.png',
+                'image_url' => null, // belum ada foto (file umkm-batik.png tidak pernah ada) — FE menampilkan placeholder
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),

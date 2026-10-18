@@ -9,13 +9,17 @@ use Illuminate\Http\Request;
 // Admin-only (lihat routes/api.php: middleware ['auth:sanctum', 'admin']).
 class AdminNotificationController extends Controller
 {
-    private const ICON_MAP = ['lingkungan' => 'Activity', 'sensor' => 'Cpu', 'festival' => 'Calendar', 'pengguna' => 'Users', 'mood' => 'Smile'];
+    private const ICON_MAP = ['lingkungan' => 'Activity', 'sensor' => 'Cpu', 'festival' => 'Calendar', 'pengguna' => 'Users', 'mood' => 'Smile', 'geofence' => 'MapPin'];
     private const TONE_MAP = ['lingkungan' => 'danger', 'sensor' => 'warn'];
 
     public function index(Request $request)
     {
-        $perPage = (int) $request->query('per_page', 20);
-        $logs = AdminNotificationModel::orderByDesc('created_at')->paginate($perPage);
+        $perPage = max(1, min(100, (int) $request->query('per_page', 20)));
+        $logs = AdminNotificationModel::query()
+            ->when($request->filled('category'), fn ($q) => $q->where('category', $request->query('category')))
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate($perPage);
 
         return response()->json([
             'data' => collect($logs->items())->map(fn ($n) => [
@@ -29,6 +33,8 @@ class AdminNotificationController extends Controller
                 'unread' => !$n->is_read,
             ]),
             'total' => AdminNotificationModel::count(),
+            'filtered_total' => $logs->total(),
+            'counts' => AdminNotificationModel::query()->selectRaw('category, COUNT(*) as n')->groupBy('category')->pluck('n', 'category'),
             'belum_dibaca' => AdminNotificationModel::where('is_read', false)->count(),
             'hari_ini' => AdminNotificationModel::whereDate('created_at', now()->toDateString())->count(),
         ]);

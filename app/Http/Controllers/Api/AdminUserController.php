@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AdminUserResource;
+use App\Models\AdminNotificationModel;
 use App\Models\MoodLogModel;
 use App\Models\UserModel;
 use Illuminate\Http\Request;
@@ -74,6 +75,8 @@ class AdminUserController extends Controller
             'is_admin' => $request->boolean('is_admin', false),
             'is_active' => $request->boolean('is_active', true),
         ]);
+
+        AdminNotificationModel::notify('pengguna', 'Pengguna Baru Ditambahkan', "Akun {$user->email} dibuat oleh admin.");
 
         return response()->json(['message' => 'Pengguna berhasil dibuat', 'data' => new AdminUserResource($user)], 201);
     }

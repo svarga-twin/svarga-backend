@@ -67,7 +67,7 @@ class MoodLogController extends Controller
         $logs = MoodLogModel::query()
             ->when($greenSpaceId, fn ($q) => $q->where('green_space_id', $greenSpaceId))
             ->where('logged_at', '>=', $since)
-            ->get(['mood_score', 'logged_at']);
+            ->get(['mood_score', 'logged_at', 'user_id', 'anonymous_session_id']);
 
         // Tren harian: rata-rata skor per tanggal, mengisi hari tanpa data dengan null
         // supaya grafik FE tetap punya sumbu-x yang lengkap (bukan bolong). Distribusi
@@ -97,8 +97,14 @@ class MoodLogController extends Controller
             $distribution[$log->mood_score] = ($distribution[$log->mood_score] ?? 0) + 1;
         }
 
+        // Kontributor unik: akun login + sesi tamu. Catatan tanpa identitas apa pun
+        // (tidak bisa di-dedupe) dihitung sebagai satu kontributor masing-masing.
+        $identified = $logs->map(fn ($l) => $l->user_id ? 'u' . $l->user_id : ($l->anonymous_session_id ? 's' . $l->anonymous_session_id : null));
+        $uniqueContributors = $identified->filter()->unique()->count() + $identified->filter(fn ($v) => $v === null)->count();
+
         return response()->json([
             'green_space_id' => $greenSpaceId,
+            'unique_contributors' => $uniqueContributors,
             'days' => $days,
             'total_entries' => $logs->count(),
             'average_score' => $logs->isEmpty() ? null : round($logs->avg('mood_score'), 2),
