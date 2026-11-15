@@ -86,15 +86,59 @@ class OpenMeteoAirTest extends TestCase
             ->assertJsonPath('readings.pm25.value', 30)->assertJsonPath('readings.pm25.is_stale', false);
     }
 
-    public function test_mode_openmeteo_menimpa_sensor(): void
+    public function test_mode_openmeteo_menimpa_sensor_yang_bukan_esp_aktif(): void
+    {
+        config(['openmeteo.mode' => 'openmeteo']);
+        $this->fakeOpenMeteo();
+        // Bacaan basi (> 5 mnt) = ESP tidak aktif → Open-Meteo boleh menimpa.
+        SensorReadingModel::insert([
+            ['device_code' => 'x', 'koridor_id' => (string) $this->koridor->id, 'sensor_type' => 'pm25', 'value' => 80, 'recorded_at' => now()->subHour()],
+        ]);
+
+        $this->getJson('/api/sensors/snapshot?koridor_id='.$this->koridor->id)->assertJsonPath('readings.pm25.value', 30);
+    }
+
+    public function test_esp_aktif_menang_atas_open_meteo_bahkan_di_mode_openmeteo(): void
     {
         config(['openmeteo.mode' => 'openmeteo']);
         $this->fakeOpenMeteo();
         SensorReadingModel::insert([
-            ['device_code' => 'x', 'koridor_id' => (string) $this->koridor->id, 'sensor_type' => 'pm25', 'value' => 80, 'recorded_at' => now()],
+            ['device_code' => 'esp-1', 'koridor_id' => (string) $this->koridor->id, 'sensor_type' => 'temperature', 'value' => 29.5, 'recorded_at' => now()],
+            ['device_code' => 'esp-1', 'koridor_id' => (string) $this->koridor->id, 'sensor_type' => 'humidity', 'value' => 70, 'recorded_at' => now()],
         ]);
 
-        $this->getJson('/api/sensors/snapshot?koridor_id='.$this->koridor->id)->assertJsonPath('readings.pm25.value', 30);
+        $r = $this->getJson('/api/sensors/snapshot?koridor_id='.$this->koridor->id)->assertOk();
+        // Suhu & kelembapan dari ESP32 (bukan 31.4 dari Open-Meteo); polutan yang tak diukur ESP boleh dilengkapi.
+        $r->assertJsonPath('readings.temperature.value', 29.5)->assertJsonMissingPath('readings.temperature.source')
+            ->assertJsonPath('readings.humidity.value', 70)
+            ->assertJsonPath('readings.pm25.source', 'open-meteo');
+    }
+
+    public function test_esp_aktif_dan_lengkapi_dimatikan_open_meteo_tidak_dipakai_sama_sekali(): void
+    {
+        config(['openmeteo.mode' => 'auto', 'openmeteo.lengkapi_saat_esp' => false]);
+        $this->fakeOpenMeteo();
+        SensorReadingModel::insert([
+            ['device_code' => 'esp-1', 'koridor_id' => (string) $this->koridor->id, 'sensor_type' => 'temperature', 'value' => 29.5, 'recorded_at' => now()],
+        ]);
+
+        $this->getJson('/api/sensors/snapshot?koridor_id='.$this->koridor->id)->assertOk()
+            ->assertJsonPath('readings.temperature.value', 29.5)->assertJsonMissingPath('readings.pm25');
+    }
+
+    public function test_active_memakai_koridor_esp_yang_mengirim_tanpa_field_aktif(): void
+    {
+        config(['openmeteo.mode' => 'openmeteo']);
+        $this->fakeOpenMeteo();
+        $lain = KoridorModel::create([
+            'short_name' => 'Lain', 'formal_name' => 'Koridor Lain', 'hijau_level' => 'paling_hijau', 'hijau_score' => 5, 'status' => 'pilot', 'path' => [[-8.30, 114.30], [-8.31, 114.31]],
+        ]);
+        SensorReadingModel::insert([
+            ['device_code' => 'esp-1', 'koridor_id' => (string) $lain->id, 'sensor_type' => 'temperature', 'value' => 29.5, 'recorded_at' => now()],
+        ]);
+
+        $this->getJson('/api/sensors/active')->assertOk()
+            ->assertJsonPath('koridor_id', (string) $lain->id)->assertJsonPath('source', 'sensor')->assertJsonPath('is_stale', false);
     }
 
     public function test_snapshots_semua_koridor_dan_active_memakai_koridor_bawaan(): void

@@ -12,6 +12,11 @@ return [
     // Koridor yang dipakai kartu ISPU di home saat tidak ada wilayah ESP32 yang aktif. Kosong = koridor pertama.
     'default_koridor_id' => env('OPENMETEO_DEFAULT_KORIDOR_ID'),
 
+    // Saat ada ESP32 aktif di koridor: jenis sensor yang dikirim ESP32 (suhu, kelembapan) SELALU dari ESP32.
+    // true  = Open-Meteo masih boleh melengkapi jenis yang tidak diukur ESP32 (mis. PM2.5/PM10 untuk ISPU)
+    // false = Open-Meteo tidak dipakai sama sekali selama ESP32 aktif
+    'lengkapi_saat_esp' => (bool) env('OPENMETEO_LENGKAPI_SAAT_ESP', true),
+
     'cache_minutes' => (int) env('OPENMETEO_CACHE_MINUTES', 10),
     'timeout_sec' => (int) env('OPENMETEO_TIMEOUT_SEC', 6),
 

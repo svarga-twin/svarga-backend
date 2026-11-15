@@ -195,7 +195,7 @@ class EcoCoachData
         $nilai = $segar->all();
         $dariOm = [];
         if ($om = OpenMeteoAir::bacaan($k)) {
-            ['nilai' => $nilai, 'dariOm' => $dariOm] = OpenMeteoAir::isi($nilai, $om['values']);
+            ['nilai' => $nilai, 'dariOm' => $dariOm] = OpenMeteoAir::isi($nilai, $om['values'], OpenMeteoAir::tipeEspSegar((string) $id));
             if (in_array(SensorReadingModel::TYPE_TEMPERATURE, $dariOm, true)) {
                 $out['suhuC'] = round($nilai[SensorReadingModel::TYPE_TEMPERATURE], 1);
             }

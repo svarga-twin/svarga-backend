@@ -132,8 +132,16 @@ class SensorReadingController extends Controller
         $koridorId = $isStale ? null : $state['koridor_id'];
         $sumber = 'sensor';
 
-        // Open-Meteo: tanpa wilayah ESP32 yang aktif (atau mode "openmeteo"), kartu ISPU memakai koridor bawaan.
-        if (OpenMeteoAir::aktif() && ($koridorId === null || OpenMeteoAir::mode() === 'openmeteo')) {
+        // ESP32 yang tidak melapor `aktif` (mis. payload datar DHT11) tetap dianggap aktif selama datanya segar
+        // (< 5 menit). Jangan dipakai bila perangkat baru saja melapor eksplisit semua OFF (state segar, koridor null).
+        if ($koridorId === null && (! $state || $isStale) && ($esp = OpenMeteoAir::koridorEspAktif()) !== null) {
+            $koridorId = $esp['koridor_id'];
+            $reportedAt = $esp['at'];
+            $isStale = false;
+        }
+
+        // Open-Meteo hanya cadangan: dipakai bila TIDAK ada ESP32 aktif (di semua mode, termasuk `openmeteo`).
+        if (OpenMeteoAir::aktif() && ($koridorId === null || $isStale)) {
             if (($bawaan = OpenMeteoAir::koridorBawaan()) !== null) {
                 $koridorId = (string) $bawaan;
                 $isStale = false;
@@ -277,7 +285,10 @@ class SensorReadingController extends Controller
         $stale = !$newest || $newest->lte($threshold);
 
         if ($koridor && ($om = OpenMeteoAir::bacaan($koridor))) {
-            $isi = OpenMeteoAir::isi($segar, $om['values']);
+            // Jenis sensor yang segar dari ESP32 sungguhan tidak boleh disentuh Open-Meteo.
+            $espTipe = $latest->filter(fn ($r) => ! $r->recorded_at->lte($threshold) && OpenMeteoAir::deviceNyata($r->device_code))
+                ->pluck('sensor_type')->all();
+            $isi = OpenMeteoAir::isi($segar, $om['values'], $espTipe);
             foreach ($isi['dariOm'] as $tipe) {
                 $readings[$tipe] = [
                     'sensor_type' => $tipe,

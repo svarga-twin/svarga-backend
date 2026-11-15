@@ -58,6 +58,42 @@ class OpenMeteoAir
         return ['lat' => round($lat, 2), 'lng' => round($lng, 2)]; // ~1 km: koridor berdekatan berbagi satu cache
     }
 
+    /** Perangkat sungguhan = bukan perangkat virtual server-side (`open-meteo`, `seed-*`). */
+    public static function deviceNyata(?string $deviceCode): bool
+    {
+        return $deviceCode !== null && $deviceCode !== self::SUMBER && ! str_starts_with($deviceCode, 'seed');
+    }
+
+    private static function espSegarQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return SensorReadingModel::query()
+            ->where('recorded_at', '>', Carbon::now()->subMinutes(SensorReadingModel::FRESHNESS_WINDOW_MINUTES))
+            ->where('device_code', '!=', self::SUMBER)
+            ->where('device_code', 'not like', 'seed%');
+    }
+
+    /**
+     * Jenis sensor yang punya bacaan SEGAR (< 5 menit) dari ESP32 sungguhan di koridor ini.
+     * Jenis-jenis ini TIDAK PERNAH diganti Open-Meteo, apa pun OPENMETEO_MODE.
+     *
+     * @return string[]
+     */
+    public static function tipeEspSegar(string $koridorId): array
+    {
+        return self::espSegarQuery()->where('koridor_id', $koridorId)->distinct()->pluck('sensor_type')->all();
+    }
+
+    /**
+     * Koridor dari ESP32 yang paling baru mengirim (data segar). Dipakai kartu ISPU home saat perangkat
+     * tidak melaporkan `aktif` (mis. payload datar DHT11). @return array{koridor_id: string, at: Carbon}|null
+     */
+    public static function koridorEspAktif(): ?array
+    {
+        $row = self::espSegarQuery()->whereNotNull('koridor_id')->orderByDesc('recorded_at')->first(['koridor_id', 'recorded_at']);
+
+        return $row ? ['koridor_id' => (string) $row->koridor_id, 'at' => $row->recorded_at] : null;
+    }
+
     /** Koridor untuk kartu ISPU home saat tidak ada wilayah ESP32 yang aktif. */
     public static function koridorBawaan(): ?int
     {
@@ -95,18 +131,29 @@ class OpenMeteoAir
 
     /**
      * Gabungkan bacaan sensor yang masih segar dengan Open-Meteo sesuai mode.
-     *  - openmeteo: nilai Open-Meteo menimpa sensor.
+     *  - ESP32 AKTIF menang mutlak: jenis sensor yang punya bacaan segar dari ESP32 ($espTipe) tidak pernah
+     *    diganti Open-Meteo, termasuk di mode `openmeteo`.
+     *  - openmeteo: nilai Open-Meteo menimpa sensor (kecuali jenis di $espTipe).
      *  - auto: kelompok polutan (satu kesatuan, supaya ISPU tidak dicampur dua sumber) dan suhu
      *          diisi Open-Meteo hanya jika sensor tidak punya bacaan segar untuknya.
+     *  - Bila ada ESP32 aktif dan OPENMETEO_LENGKAPI_SAAT_ESP=false, Open-Meteo tidak dipakai sama sekali.
      *
      * @param array<string,float> $sensorSegar
      * @param array<string,float> $om
+     * @param string[] $espTipe jenis sensor yang segar dari ESP32 sungguhan di koridor ini
      * @return array{nilai: array<string,float>, dariOm: string[]}
      */
-    public static function isi(array $sensorSegar, array $om): array
+    public static function isi(array $sensorSegar, array $om, array $espTipe = []): array
     {
         $nilai = $sensorSegar;
         $dariOm = [];
+
+        if ($espTipe !== []) {
+            if (! config('openmeteo.lengkapi_saat_esp', true)) {
+                return ['nilai' => $nilai, 'dariOm' => []];
+            }
+            $om = array_diff_key($om, array_flip($espTipe));
+        }
 
         if (self::mode() === 'openmeteo') {
             foreach ($om as $tipe => $v) {
