@@ -9,11 +9,26 @@ return new class extends Migration
     public function up(): void
     {
         // Kupon kini bertingkat & bisa diklaim ulang tiap bulan → hapus batas "satu kupon per misi".
-        Schema::table('vouchers', function (Blueprint $table) {
-            $table->dropUnique(['user_id', 'source']);
-            $table->unsignedTinyInteger('tier')->nullable()->after('source');
-            $table->index(['user_id', 'tier']);
-        });
+        //
+        // Urutan penting di MySQL: FK `vouchers.user_id` memakai unique (user_id, source) sebagai
+        // index-nya, jadi unique itu baru boleh di-drop SETELAH ada index lain berawalan user_id
+        // (error 1553). Tiap langkah dipisah & dijaga hasColumn/hasIndex karena DDL MySQL tidak
+        // transaksional — deploy yang gagal sebelumnya bisa sudah menambah kolom `tier`.
+        if (! Schema::hasColumn('vouchers', 'tier')) {
+            Schema::table('vouchers', function (Blueprint $table) {
+                $table->unsignedTinyInteger('tier')->nullable()->after('source');
+            });
+        }
+        if (! Schema::hasIndex('vouchers', ['user_id', 'tier'])) {
+            Schema::table('vouchers', function (Blueprint $table) {
+                $table->index(['user_id', 'tier']);
+            });
+        }
+        if (Schema::hasIndex('vouchers', ['user_id', 'source'], 'unique')) {
+            Schema::table('vouchers', function (Blueprint $table) {
+                $table->dropUnique(['user_id', 'source']);
+            });
+        }
 
         // Cooldown klaim per pengguna per tingkat. available_at = kapan boleh klaim lagi.
         Schema::create('voucher_cooldowns', function (Blueprint $table) {
@@ -51,10 +66,13 @@ return new class extends Migration
         });
         Schema::dropIfExists('byo_tokens');
         Schema::dropIfExists('voucher_cooldowns');
+        // Kebalikan urutan up(): pasang lagi unique dulu supaya FK user_id tetap punya index.
+        Schema::table('vouchers', function (Blueprint $table) {
+            $table->unique(['user_id', 'source']);
+        });
         Schema::table('vouchers', function (Blueprint $table) {
             $table->dropIndex(['user_id', 'tier']);
             $table->dropColumn('tier');
-            $table->unique(['user_id', 'source']);
         });
     }
 };
