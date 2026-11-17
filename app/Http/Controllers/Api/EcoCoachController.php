@@ -63,8 +63,9 @@ class EcoCoachController extends Controller
     private function balas(array $hasil, string $mode): JsonResponse
     {
         // Alasan fallback bersifat internal (mis. "LLM error 401") — dicatat di log, tidak dibocorkan ke klien kecuali debug.
-        if ($hasil['sumber'] === 'template' && isset($hasil['alasan']) && config('ecocoach.provider')) {
-            Log::warning('Eco-Coach memakai template cadangan', ['mode' => $mode, 'alasan' => $hasil['alasan']]);
+        // Provider kosong = AI mati: tetap dicatat (notice) agar tidak luput; provider terisi tapi gagal = warning.
+        if ($hasil['sumber'] === 'template' && isset($hasil['alasan'])) {
+            Log::log(config('ecocoach.provider') ? 'warning' : 'notice', 'Eco-Coach memakai template cadangan', ['mode' => $mode, 'alasan' => $hasil['alasan']]);
         }
         if (! config('app.debug')) {
             unset($hasil['alasan']);

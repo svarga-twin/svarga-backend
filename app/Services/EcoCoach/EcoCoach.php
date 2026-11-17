@@ -186,15 +186,7 @@ TXT;
             }
             $r = $this->kirim(rtrim($this->config['base_url'], '/').'/chat/completions', [
                 'Authorization' => 'Bearer '.$this->config['openai_api_key'],
-            ], [
-                'model' => $this->config['model'],
-                'max_tokens' => $maxTokens,
-                'temperature' => 0.3,
-                'messages' => [
-                    ['role' => 'system', 'content' => $pesan['system']],
-                    ['role' => 'user', 'content' => $pesan['user']],
-                ],
-            ], $timeout);
+            ], $this->bodyOpenai($pesan, $maxTokens), $timeout);
             if ($r['status'] < 200 || $r['status'] >= 300) {
                 throw new RuntimeException("LLM error {$r['status']}");
             }
@@ -203,6 +195,33 @@ TXT;
         }
 
         throw new RuntimeException('LLM_PROVIDER belum diatur (anthropic / openai)');
+    }
+
+    /**
+     * API resmi OpenAI menolak `max_tokens` untuk model baru (seri o / gpt-5), dan model reasoning hanya
+     * menerima temperature bawaan. Endpoint kompatibel lain (Groq, OpenRouter, Ollama) tetap `max_tokens`.
+     *
+     * @param array{system:string,user:string} $pesan
+     */
+    private function bodyOpenai(array $pesan, int $maxTokens): array
+    {
+        $model = (string) ($this->config['model'] ?? '');
+        $reasoning = (bool) preg_match('/^(o\d|gpt-5)/i', $model);
+        $openaiResmi = str_contains((string) parse_url((string) $this->config['base_url'], PHP_URL_HOST), 'api.openai.com');
+
+        $body = [
+            'model' => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => $pesan['system']],
+                ['role' => 'user', 'content' => $pesan['user']],
+            ],
+            ($openaiResmi || $reasoning ? 'max_completion_tokens' : 'max_tokens') => $maxTokens,
+        ];
+        if (! $reasoning) {
+            $body['temperature'] = 0.3;
+        }
+
+        return $body;
     }
 
     // ------------------------------------------------------------------ pengaman angka

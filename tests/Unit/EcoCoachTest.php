@@ -121,7 +121,7 @@ class EcoCoachTest extends TestCase
 
     public function test_pesan_ke_llm_memuat_aturan_data_dan_pertanyaan_dipotong(): void
     {
-        $dikirim = null;
+        $dikirim = [];
         $this->openai('ok 450 m', 200, $dikirim)->jawab('tanya', $this->data(), str_repeat('a', 500));
         $this->assertSame('http://palsu/v1/chat/completions', $dikirim['url']);
         $this->assertSame('Bearer x', $dikirim['headers']['Authorization']);
@@ -135,7 +135,7 @@ class EcoCoachTest extends TestCase
 
     public function test_anthropic_membaca_blok_konten_dan_mengirim_header_kunci(): void
     {
-        $dikirim = null;
+        $dikirim = [];
         $http = function ($url, $headers, $body, $t) use (&$dikirim) {
             $dikirim = compact('url', 'headers', 'body');
 
@@ -152,9 +152,46 @@ class EcoCoachTest extends TestCase
 
     public function test_laporan_memberi_ruang_token_lebih_besar(): void
     {
-        $dikirim = null;
+        $dikirim = [];
         $this->openai('x', 200, $dikirim)->jawab('laporan', ['mingguan' => ['aktivitas' => 1]]);
         $this->assertSame(700, $dikirim['body']['max_tokens']);
+    }
+
+    private function openaiDengan(string $baseUrl, string $model, ?array &$dikirim): EcoCoach
+    {
+        $http = function (string $url, array $headers, array $body, float $timeout) use (&$dikirim) {
+            $dikirim = compact('url', 'body');
+
+            return ['status' => 200, 'json' => ['choices' => [['message' => ['content' => 'ok']]]]];
+        };
+
+        return new EcoCoach(['provider' => 'openai', 'openai_api_key' => 'x', 'base_url' => $baseUrl, 'model' => $model], $http);
+    }
+
+    public function test_openai_resmi_memakai_max_completion_tokens(): void
+    {
+        $dikirim = [];
+        $this->openaiDengan('https://api.openai.com/v1', 'gpt-4o-mini', $dikirim)->jawab('tanya', $this->data(), 'halo');
+        $this->assertSame(400, $dikirim['body']['max_completion_tokens']);
+        $this->assertArrayNotHasKey('max_tokens', $dikirim['body']);
+        $this->assertSame(0.3, $dikirim['body']['temperature']);
+    }
+
+    public function test_model_reasoning_tanpa_temperature_dan_max_tokens(): void
+    {
+        $dikirim = [];
+        $this->openaiDengan('https://openrouter.ai/api/v1', 'gpt-5-mini', $dikirim)->jawab('laporan', ['mingguan' => ['aktivitas' => 1]]);
+        $this->assertSame(700, $dikirim['body']['max_completion_tokens']);
+        $this->assertArrayNotHasKey('max_tokens', $dikirim['body']);
+        $this->assertArrayNotHasKey('temperature', $dikirim['body']);
+    }
+
+    public function test_endpoint_kompatibel_tetap_memakai_max_tokens(): void
+    {
+        $dikirim = [];
+        $this->openaiDengan('https://api.groq.com/openai/v1', 'llama-3.3-70b-versatile', $dikirim)->jawab('tanya', $this->data(), 'halo');
+        $this->assertSame(400, $dikirim['body']['max_tokens']);
+        $this->assertArrayNotHasKey('max_completion_tokens', $dikirim['body']);
     }
 
     public function test_api_key_kosong_atau_provider_belum_diatur_jatuh_ke_template(): void

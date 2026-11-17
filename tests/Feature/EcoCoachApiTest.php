@@ -10,6 +10,7 @@ use App\Models\UserModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class EcoCoachApiTest extends TestCase
@@ -129,6 +130,29 @@ class EcoCoachApiTest extends TestCase
 
         $this->assertSame('template', $r->json('data.sumber'));
         $this->assertArrayNotHasKey('alasan', $r->json('data'));
+    }
+
+    public function test_provider_kosong_tetap_dicatat_di_log(): void
+    {
+        config(['ecocoach.provider' => null]);
+        Log::spy();
+
+        $this->postJson('/api/eco-coach', ['mode' => 'tanya', 'pertanyaan' => 'Halo Eco-Coach'])->assertOk();
+
+        Log::shouldHaveReceived('log')->with('notice', 'Eco-Coach memakai template cadangan', \Mockery::on(
+            fn ($ctx) => str_contains($ctx['alasan'], 'LLM_PROVIDER belum diatur')
+        ))->once();
+    }
+
+    public function test_provider_gagal_dicatat_sebagai_warning(): void
+    {
+        config(['ecocoach.provider' => 'openai', 'ecocoach.openai_api_key' => 'x', 'ecocoach.base_url' => 'http://llm.test/v1']);
+        Http::fake(['llm.test/*' => Http::response('boom', 500)]);
+        Log::spy();
+
+        $this->postJson('/api/eco-coach', ['mode' => 'tanya', 'pertanyaan' => 'Halo Eco-Coach'])->assertOk();
+
+        Log::shouldHaveReceived('log')->with('warning', 'Eco-Coach memakai template cadangan', \Mockery::any())->once();
     }
 
     public function test_validasi_input(): void
