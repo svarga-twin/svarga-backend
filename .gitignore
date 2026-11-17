@@ -58,3 +58,9 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Video rekaman lokal (tidak di-commit ke Git karena ukuran besar; diunduh via YouTube bila dibutuhkan)
+*.mp4
+Python/**/*.mp4
+Python/**/__pycache__/
+

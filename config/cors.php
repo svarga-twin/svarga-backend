@@ -15,7 +15,7 @@ return [
 
     'allowed_origins' => array_values(array_filter(array_map(
         'trim',
-        explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:5174'))
+        explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:5174,https://jejakwangi.web.id'))
     ))),
 
     // Dev: izinkan akses dari HP/laptop lain di WiFi yang sama (mis. http://192.168.1.x:5173).

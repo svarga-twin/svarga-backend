@@ -7,7 +7,31 @@ from datetime import datetime, timedelta, timezone
 from collections import Counter, defaultdict
 from ultralytics import YOLO
 
+YOUTUBE_URL = 'https://youtu.be/IWQeqMmaO-Q'
 VIDEO_PATH = 'highway.mp4'
+
+
+def pastikan_video_tersedia(url, output_path):
+    if not os.path.exists(output_path) and url:
+        print(f"[INFO] '{output_path}' tidak ditemukan. Mengunduh dari YouTube: {url} ...")
+        try:
+            import yt_dlp
+        except ImportError:
+            raise ImportError(
+                "Pustaka 'yt-dlp' belum terpasang. Jalankan: pip install yt-dlp"
+            )
+        ydl_opts = {
+            'outtmpl': output_path,
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'merge_output_format': 'mp4',
+            'quiet': False,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        print(f"[INFO] Unduhan '{output_path}' selesai!")
+
+
+pastikan_video_tersedia(YOUTUBE_URL, VIDEO_PATH)
 MODEL_PATH = 'yolov8m.pt'
 IMG_SIZE = 960
 CONF = 0.15
