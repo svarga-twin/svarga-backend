@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             MoodLogSeeder::class,
             GreenSpaceSeeder::class,
             KoridorSeeder::class,
+            KoridorQrPointSeeder::class,
             AdminUserSeeder::class,
             AdminNotificationSeeder::class,
             ChargerStationSeeder::class,
