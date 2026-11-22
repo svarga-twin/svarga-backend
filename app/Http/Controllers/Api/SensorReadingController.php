@@ -28,6 +28,8 @@ use Illuminate\Support\Facades\Validator;
  * Hanya SATU wilayah yang bisa ON di perangkat. ESP32 menyertakan `aktif` (no wilayah, 0 = semua OFF)
  * dan hanya mengirim data wilayah aktif:
  *   {"aktif":2,"wilayah":[{"no":2,"temperature":33.5,"pm25":72,"led":true}]}
+ * ESP32 DHT11 + BMP280 (payload datar; pressure & altitude opsional, hanya ada bila BMP280 terbaca):
+ *   {"temperature":29.9,"humidity":79,"pressure":1010.5,"altitude":22.9}
  * `ts` (epoch detik) opsional; tanpa NTP cukup dihilangkan, server memakai jam sendiri.
  */
 class SensorReadingController extends Controller
@@ -50,9 +52,16 @@ class SensorReadingController extends Controller
             'wilayah.*.led' => ['nullable', 'boolean'],
         ];
         foreach (SensorReadingModel::TYPES as $type) {
-            $rules[$type] = ['nullable', 'numeric', 'between:-100000,10000000'];
-            $rules["wilayah.*.$type"] = ['nullable', 'numeric', 'between:-100000,10000000'];
+            // Rentang spesifik untuk DHT11/BMP280; jenis lain memakai rentang longgar.
+            [$min, $max] = SensorReadingModel::RANGES[$type] ?? [-100000, 10000000];
+            $rules[$type] = ['nullable', 'numeric', "between:$min,$max"];
+            $rules["wilayah.*.$type"] = ['nullable', 'numeric', "between:$min,$max"];
         }
+        // Payload ESP32 DHT11 + BMP280: suhu & kelembapan wajib bila perangkat melapor tekanan/ketinggian,
+        // dan suhu wajib bila kelembapan dikirim (pasangan DHT11 tidak boleh setengah). Payload perangkat
+        // lain (hanya pm10, wilayah[], dst.) tidak terpengaruh.
+        $rules['temperature'] = ['required_with:humidity,pressure,altitude', ...$rules['temperature']];
+        $rules['humidity'] = ['required_with:pressure,altitude', ...$rules['humidity']];
 
         $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {

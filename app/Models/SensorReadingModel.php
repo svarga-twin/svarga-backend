@@ -22,6 +22,8 @@ class SensorReadingModel extends Model
     public const TYPE_O2 = 'o2';
     // Sumber data flowchart: suhu area terbuka (pembanding kanopi), daya Solar Bench (W), hitungan kendaraan kamera YOLO.
     public const TYPE_HUMIDITY = 'humidity'; // DHT11/DHT22 (%RH)
+    public const TYPE_PRESSURE = 'pressure'; // BMP280 (hPa)
+    public const TYPE_ALTITUDE = 'altitude'; // BMP280 (m) — turunan tekanan, hanya info tambahan
     public const TYPE_TEMPERATURE_OPEN = 'temperature_open';
     public const TYPE_SOLAR_W = 'solar_w';
     public const TYPE_VEHICLE_MOTOR = 'vehicle_motor';
@@ -39,11 +41,24 @@ class SensorReadingModel extends Model
         self::TYPE_CO2,
         self::TYPE_O2,
         self::TYPE_HUMIDITY,
+        self::TYPE_PRESSURE,
+        self::TYPE_ALTITUDE,
         self::TYPE_TEMPERATURE_OPEN,
         self::TYPE_SOLAR_W,
         self::TYPE_VEHICLE_MOTOR,
         self::TYPE_VEHICLE_CAR,
         ...self::POLLUTANT_TYPES,
+    ];
+
+    /**
+     * Rentang valid per jenis (spesifikasi sensor DHT11 & BMP280). Jenis yang tidak
+     * tercantum memakai rentang longgar di controller. Di luar rentang = 422.
+     */
+    public const RANGES = [
+        self::TYPE_TEMPERATURE => [-40, 85],
+        self::TYPE_HUMIDITY => [0, 100],
+        self::TYPE_PRESSURE => [300, 1100],
+        self::TYPE_ALTITUDE => [-500, 9000],
     ];
 
     /** Data dianggap "langsung" jika umurnya di bawah ini (arahan mentor: 5 menit). */
@@ -60,6 +75,8 @@ class SensorReadingModel extends Model
     {
         return match ($sensorType) {
             self::TYPE_TEMPERATURE, self::TYPE_TEMPERATURE_OPEN => '°C',
+            self::TYPE_PRESSURE => 'hPa',
+            self::TYPE_ALTITUDE => 'm',
             self::TYPE_SOLAR_W => 'W',
             self::TYPE_VEHICLE_MOTOR, self::TYPE_VEHICLE_CAR => 'unit',
             self::TYPE_AIR_QUALITY => 'AQI',

@@ -72,6 +72,52 @@ class SensorReadingApiTest extends TestCase
         $this->assertDatabaseCount('sensor_readings', 0);
     }
 
+    public function test_payload_dht11_dan_bmp280_tersimpan_beserta_satuannya(): void
+    {
+        $this->kirim(['temperature' => 29.9, 'humidity' => 79, 'pressure' => 1010.5, 'altitude' => 22.9])
+            ->assertStatus(201)
+            ->assertJsonPath('n', 4);
+
+        $this->assertDatabaseHas('sensor_readings', ['sensor_type' => 'pressure', 'value' => 1010.5, 'koridor_id' => '1']);
+        $this->assertDatabaseHas('sensor_readings', ['sensor_type' => 'altitude', 'value' => 22.9]);
+
+        $this->getJson('/api/sensors/snapshot?koridor_id=1')
+            ->assertOk()
+            ->assertJsonPath('readings.humidity.value', 79)
+            ->assertJsonPath('readings.pressure.value', 1010.5)
+            ->assertJsonPath('readings.pressure.unit', 'hPa')
+            ->assertJsonPath('readings.altitude.value', 22.9)
+            ->assertJsonPath('readings.altitude.unit', 'm');
+    }
+
+    public function test_tanpa_bmp280_hanya_suhu_dan_kelembapan_tetap_diterima(): void
+    {
+        $this->kirim(['temperature' => 29.9, 'humidity' => 79])->assertStatus(201)->assertJsonPath('n', 2);
+        $this->assertDatabaseMissing('sensor_readings', ['sensor_type' => 'pressure']);
+    }
+
+    public function test_suhu_dan_kelembapan_wajib_bila_bmp280_atau_kelembapan_dikirim(): void
+    {
+        $this->kirim(['humidity' => 79])->assertStatus(422)->assertJsonValidationErrors('temperature');
+        $this->kirim(['temperature' => 29.9, 'pressure' => 1010.5])->assertStatus(422)->assertJsonValidationErrors('humidity');
+        $this->kirim(['pressure' => 1010.5, 'altitude' => 22.9])->assertStatus(422);
+        $this->assertDatabaseCount('sensor_readings', 0);
+        // perangkat lain tanpa DHT11 tidak terpengaruh
+        $this->kirim(['pm10' => 41])->assertStatus(201);
+    }
+
+    public function test_nilai_di_luar_rentang_sensor_ditolak_422(): void
+    {
+        $this->kirim(['temperature' => 90])->assertStatus(422);
+        $this->kirim(['temperature' => -41])->assertStatus(422);
+        $this->kirim(['humidity' => 101])->assertStatus(422);
+        $this->kirim(['temperature' => 30, 'pressure' => 299])->assertStatus(422);
+        $this->kirim(['temperature' => 30, 'pressure' => 1101])->assertStatus(422);
+        $this->kirim(['temperature' => 30, 'altitude' => 9001])->assertStatus(422);
+        $this->kirim(['temperature' => 30, 'altitude' => -501])->assertStatus(422);
+        $this->assertDatabaseCount('sensor_readings', 0);
+    }
+
     public function test_ts_masuk_akal_dipakai_dan_ts_ngawur_diabaikan(): void
     {
         $ok = now()->subMinutes(10)->timestamp;
